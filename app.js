@@ -129,9 +129,10 @@ async function start() {
 }
 
 async function loadModels() {
+  if (location.protocol === 'file:') throw new Error('local-file');
   if (!window.faceapi) throw new Error('library');
   if (!modelPromise) {
-    const url = 'https://cdn.jsdelivr.net/gh/justadudewhohacks/face-api.js@0.22.2/weights';
+    const url = 'assets/models';
     modelPromise = Promise.all([
       faceapi.nets.ssdMobilenetv1.loadFromUri(url),
       faceapi.nets.faceLandmark68Net.loadFromUri(url),
@@ -158,8 +159,15 @@ async function prepareReference() {
     if (!descriptors.length) throw new Error('references');
     reference = descriptors;
     faceMessage(`Готово образцов: ${descriptors.length}. Поиск лица…`);
-  } catch (_) {
-    if (revision === referenceRevision) faceMessage('Модель недоступна. Проверь интернет и переключи режим для повторной загрузки.');
+  } catch (error) {
+    console.error('Face model initialization:', error);
+    if (revision !== referenceRevision) return;
+    const errors = {
+      'local-file': 'Открой сайт через localhost или HTTPS. При открытии index.html как файла модель не работает.',
+      library: 'Не загружена библиотека из assets/vendor. Обнови страницу и проверь файлы проекта.',
+      references: 'На образцах не удалось найти лицо. Модель загружена, но сравнение пока недоступно.'
+    };
+    faceMessage(errors[error.message] || 'Ошибка загрузки файлов модели или её запуска. Переключи режим для повторной попытки. Подробности в консоли браузера.');
   }
 }
 async function detectFace(id) {
