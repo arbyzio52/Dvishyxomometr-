@@ -30,7 +30,7 @@
   <canvas id="preview" width="640" height="480" aria-label="Анализируемая область камеры"></canvas>
   <div id="placeholder"><span>Подключение камеры…</span></div>
   <div class="camera-hud">
-    <div class="hud-head"><p id="message" role="status" aria-live="polite"></p><span id="live">● OFFLINE</span>
+    <div class="hud-head"><p id="message" role="status" aria-live="polite"></p><span id="live">● OFFLINE</span><button id="retryCamera" hidden>Запустить камеру</button>
     <div id="colorStats" class="metrics"><div>БЕЛЫЙ <b id="white">—</b></div><div>СИНИЙ <b id="blue">—</b></div><div>КРАСНЫЙ <b id="red">—</b></div></div>
     <div id="faceStats" hidden><b id="face">—</b><p id="faceStatus" role="status" aria-live="polite">Модель загрузится в режиме лица.</p></div></div>
     <div class="hud-reading"><div id="cameraMeter" class="meter" role="meter" aria-label="Уровень движухи" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div><div><output id="cameraValue">00</output> ДВЖ</div></div>

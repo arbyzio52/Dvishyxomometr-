@@ -67,6 +67,7 @@ function syncAudio() {
 }
 function setPhase(next) {
   phase = next;
+  $('retryCamera').hidden = next !== 'idle';
   $('start').textContent = next === 'starting' ? 'Отменить подключение' : next === 'running' ? 'Остановить' : 'Начать измерение';
   $('switch').disabled = next === 'starting';
   $('live').textContent = next === 'running' ? '● LIVE' : next === 'starting' ? '● ПОДКЛЮЧЕНИЕ' : '● OFFLINE';
@@ -230,6 +231,7 @@ function setMode(next) {
   $('modeNote').textContent = mode === 'face' ? 'Условное сходство с фиксированными образцами. Обработка на устройстве.' : 'Уровень по белому, синему и красному цветам. Обработка на устройстве.';
   if (mode === 'face' && !reference) prepareReference();
 }
+$('retryCamera').onclick = () => { unlockAudio(); start(); };
 $('colorMode').onclick = () => setMode('colors');
 $('faceMode').onclick = () => setMode('face');
 function closeCamera() { stop(); dialog.close(); $('start').focus(); }
