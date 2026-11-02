@@ -11,28 +11,35 @@
 </head>
 <body>
 <main class="device">
-  <header><h1>✳ ДВИЖУХОМЕТР</h1><p>ДВ–2026 / LIVE EDITION</p></header>
+  <header><h1><span class="flag" role="img" aria-label="Россия"></span> ДВИЖУХОМЕТР</h1><p>ДВ–2026 / LIVE EDITION</p></header>
   <section class="panel scale" aria-label="Уровень движухи">
     <div class="scale-head"><span aria-hidden="true">🥱</span><span id="status">ОЖИДАНИЕ СИГНАЛА</span><span aria-hidden="true">💀</span></div>
     <div id="meter" class="meter" role="meter" aria-label="Уровень движухи" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
-    <div class="range"><span>ТИШИНА</span><span>МАКСИМУМ</span></div>
+    <div class="range"><span>ЗАСТОЙ</span><span>ДВИЖУХА</span></div>
   </section>
   <section class="readings">
     <div class="panel readout"><output id="value">00</output><span>ДВЖ / 100</span></div>
-    <div class="controls"><span class="label">УПРАВЛЕНИЕ</span><button id="start" class="primary">Начать измерение</button><div class="buttons"><button id="switch" aria-label="Переключить камеру" title="Переключить камеру">↻</button><button id="sound" aria-label="Выключить звук" aria-pressed="false" title="Звук">♪</button></div></div>
+    <div class="controls"><span class="label">УПРАВЛЕНИЕ</span><button id="start" class="primary">Начать измерение</button></div>
   </section>
-  <section class="panel camera">
-    <div class="section-head"><h2>КАМЕРА</h2><span id="live">● OFFLINE</span></div>
-    <div class="video-box"><canvas id="preview" width="640" height="480" aria-label="Анализируемая область камеры"></canvas><div id="placeholder">◎<span>Камера выключена</span></div></div>
-    <p id="message" role="status" aria-live="polite">Для запуска разреши доступ к камере.</p>
-    <div class="metrics"><div>БЕЛЫЙ<b id="white">—</b></div><div>СИНИЙ<b id="blue">—</b></div><div>КРАСНЫЙ<b id="red">—</b></div></div>
-  </section>
-  <details class="panel reference" open><summary>СХОДСТВО С ОБРАЗЦОМ <b id="face">—</b></summary><div class="reference-body"><img id="referencePreview" src="assets/reference.jpg" alt="Образец для сравнения лица"><div><label class="upload" for="referenceFile">Выбрать своё фото</label><input id="referenceFile" type="file" accept="image/*"><button id="resetReference">Вернуть исходное</button></div></div><p id="faceStatus" role="status" aria-live="polite">Модель загрузится при запуске камеры.</p><p class="note">Фото обрабатывается только в этой вкладке. Процент — условное сходство, а не вероятность совпадения личности.</p></details>
+  <p id="homeMessage" role="status">Два режима: цвета кадра или сходство лица.</p>
   <footer>ДВИЖУХОМЕТР · ДВ–01<p>Шуточный показатель по цветам кадра и сходству лица.</p></footer>
 </main>
+<dialog id="cameraDialog" aria-label="Анализ по видео">
+  <div class="camera-top"><strong>АНАЛИЗ ПО ВИДЕО</strong><button id="closeCamera" aria-label="Закрыть камеру">×</button></div>
+  <div class="mode-switch" role="group" aria-label="Режим анализа"><button id="colorMode" aria-pressed="true">Цвета</button><button id="faceMode" aria-pressed="false">Лицо</button><button id="switch" aria-label="Переключить камеру">↻</button></div>
+  <canvas id="preview" width="640" height="480" aria-label="Анализируемая область камеры"></canvas>
+  <div id="placeholder"><span>Подключение камеры…</span></div>
+  <div class="camera-hud">
+    <div class="hud-head"><p id="message" role="status" aria-live="polite"></p><span id="live">● OFFLINE</span>
+    <div id="colorStats" class="metrics"><div>БЕЛЫЙ <b id="white">—</b></div><div>СИНИЙ <b id="blue">—</b></div><div>КРАСНЫЙ <b id="red">—</b></div></div>
+    <div id="faceStats" hidden><b id="face">—</b><p id="faceStatus" role="status" aria-live="polite">Модель загрузится в режиме лица.</p></div></div>
+    <div class="hud-reading"><div id="cameraMeter" class="meter" role="meter" aria-label="Уровень движухи" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div><div><output id="cameraValue">00</output> ДВЖ</div></div>
+    <p class="note" id="modeNote">Кадр анализируется на устройстве</p>
+  </div>
+</dialog>
 <video id="video" playsinline muted hidden></video>
 <canvas id="canvas" width="160" height="120" hidden></canvas>
-<audio id="low" src="assets/low.mp3" loop preload="auto"></audio>
-<audio id="high" src="assets/high.mp3" loop preload="auto"></audio>
+<audio id="low" src="assets/high.mp3" loop preload="auto"></audio>
+<audio id="high" src="assets/low.mp3" loop preload="auto"></audio>
 </body>
 </html>

@@ -11,14 +11,16 @@ let stream = null, phase = 'idle', session = 0, facing = 'environment';
 let frame = 0, lastTick = 0, lastFace = 0, smoothed = 0, faceScore = 0;
 let muted = false, audioMode = 'low', audioRevision = 0;
 let modelPromise = null, reference = null, referenceRevision = 0, referenceUrl = null;
-let faceBusy = false;
+let faceBusy = false, mode = 'colors', modeRevision = 0;
+const dialog = $('cameraDialog');
 
 for (let i = 0; i < 24; i++) {
   const bar = document.createElement('i');
   bar.style.setProperty('--color', `hsl(${115 - i * 5} 88% 50%)`);
   meter.appendChild(bar);
 }
-const message = text => { $('message').textContent = text; };
+$('cameraMeter').innerHTML = meter.innerHTML;
+const message = text => { $('message').textContent = text; $('homeMessage').textContent = text; };
 const faceMessage = text => { $('faceStatus').textContent = text; };
 const alive = id => id === session && phase === 'running';
 
@@ -26,6 +28,9 @@ function render(value) {
   const n = Math.max(0, Math.min(100, Math.round(value)));
   $('value').textContent = String(n).padStart(2, '0');
   meter.setAttribute('aria-valuenow', n);
+  $('cameraValue').textContent = String(n).padStart(2, '0');
+  $('cameraMeter').setAttribute('aria-valuenow', n);
+  [...$('cameraMeter').children].forEach((bar, i) => bar.classList.toggle('on', i < Math.ceil(n / 100 * 24)));
   [...meter.children].forEach((bar, i) => bar.classList.toggle('on', i < Math.ceil(n / 100 * 24)));
   $('status').textContent = phase !== 'running' ? 'ОЖИДАНИЕ СИГНАЛА' : n >= 80 ? 'ДВИЖУХА НА МАКСИМУМЕ' : n >= 40 ? 'НАБИРАЕМ ОБОРОТЫ' : 'ПОИСК ДВИЖУХИ';
   if (phase === 'running') {
@@ -55,7 +60,7 @@ function syncAudio() {
     else {
       audio.muted = false;
       audio.play()?.catch(() => {
-        if (phase === 'running' && !muted) message('Нажми кнопку звука, чтобы разрешить воспроизведение.');
+        if (phase === 'running' && !muted) message('Коснись экрана камеры, чтобы разрешить звук.');
       });
     }
   }
@@ -88,6 +93,8 @@ async function start() {
     message('Камера недоступна. Открой сайт через HTTPS или localhost.'); return;
   }
   const id = ++session;
+  if (!dialog.open) dialog.showModal();
+  $('closeCamera').focus();
   setPhase('starting');
   message('Разреши доступ к камере. Повторное нажатие отменит подключение.');
   let acquired;
@@ -106,7 +113,7 @@ async function start() {
     message('Анализируется вся область превью. Обработка остаётся на устройстве.');
     syncAudio();
     frame = requestAnimationFrame(tick);
-    prepareReference();
+    if (mode === 'face' && !reference) prepareReference();
   } catch (error) {
     acquired?.getTracks().forEach(t => t.stop());
     if (id !== session) return;
@@ -134,38 +141,43 @@ async function loadModels() {
 }
 async function prepareReference() {
   const revision = ++referenceRevision;
-  reference = null; faceScore = 0; $('face').textContent = '—';
-  const source = $('referencePreview').src;
-  faceMessage('Загрузка модели и проверка образца…');
+  reference = null; faceScore = 0;
+  faceMessage('Загрузка модели и образцов…');
   try {
     await loadModels();
-    const image = new Image(); image.src = source; await image.decode();
-    const result = await faceapi.detectSingleFace(image, new faceapi.SsdMobilenetv1Options({ minConfidence: .45 })).withFaceLandmarks().withFaceDescriptor();
+    const descriptors = [];
+    for (const source of ['assets/reference.jpg', 'assets/reference-front.png', 'assets/reference-side.png']) {
+      try {
+        const image = new Image(); image.src = source; await image.decode();
+        const result = await faceapi.detectSingleFace(image, new faceapi.SsdMobilenetv1Options({ minConfidence: .45 })).withFaceLandmarks().withFaceDescriptor();
+        if (result) descriptors.push(result.descriptor);
+      } catch (_) { /* Other usable references can still be used. */ }
+    }
     if (revision !== referenceRevision) return;
-    if (!result) { faceMessage('Лицо на образце не найдено. Выбери чёткое фото с целым лицом.'); return; }
-    reference = result.descriptor;
-    faceMessage(phase === 'running' ? 'Образец готов. Поиск лица в кадре…' : 'Образец готов. Запусти камеру.');
-  } catch (error) {
-    if (revision !== referenceRevision) return;
-    faceMessage('Не удалось загрузить модель или фото. Проверь интернет и выбери фото повторно.');
+    if (!descriptors.length) throw new Error('references');
+    reference = descriptors;
+    faceMessage(`Готово образцов: ${descriptors.length}. Поиск лица…`);
+  } catch (_) {
+    if (revision === referenceRevision) faceMessage('Модель недоступна. Проверь интернет и переключи режим для повторной загрузки.');
   }
 }
 async function detectFace(id) {
-  if (!alive(id) || !reference || faceBusy) return;
+  if (!alive(id) || mode !== 'face' || !reference || faceBusy) return;
   faceBusy = true;
   const revision = referenceRevision;
+  const analysisMode = modeRevision;
   // Snapshot the exact cropped frame used for color analysis and preview.
   const snapshot = document.createElement('canvas');
   snapshot.width = 640; snapshot.height = 480;
   snapshot.getContext('2d').drawImage($('preview'), 0, 0);
   try {
     const faces = await faceapi.detectAllFaces(snapshot, new faceapi.SsdMobilenetv1Options({ minConfidence: .45 })).withFaceLandmarks().withFaceDescriptors();
-    if (!alive(id) || revision !== referenceRevision) return;
-    faceScore = faces.length ? Math.max(0, Math.min(1, (.85 - Math.min(...faces.map(face => faceapi.euclideanDistance(reference, face.descriptor)))) / .4)) : 0;
+    if (!alive(id) || revision !== referenceRevision || analysisMode !== modeRevision) return;
+    faceScore = faces.length ? Math.max(0, Math.min(1, (.85 - Math.min(...faces.map(face => Math.min(...reference.map(sample => faceapi.euclideanDistance(sample, face.descriptor)))))) / .4)) : 0;
     $('face').textContent = faces.length ? `${Math.round(faceScore * 100)}%` : '—';
     faceMessage(faces.length ? 'Условное сходство с образцом' : 'Лицо не найдено');
   } catch (error) {
-    if (alive(id) && revision === referenceRevision) {
+    if (alive(id) && revision === referenceRevision && analysisMode === modeRevision) {
       faceScore = 0; $('face').textContent = '—'; faceMessage('Ошибка анализа лица. Бонус сходства сброшен.');
     }
   } finally { faceBusy = false; }
@@ -190,7 +202,7 @@ function tick(time) {
       }
       const total = data.length / 4;
       for (const [name, count] of [['white', white], ['blue', blue], ['red', red]]) $(name).textContent = `${(count / total * 100).toFixed(1)}%`;
-      const target = Math.min(100, (white + blue + red) / total * 150 + faceScore * 45);
+      const target = mode === 'colors' ? Math.min(100, (white + blue + red) / total * 150) : faceScore * 100;
       smoothed = smoothed * .65 + target * .35;
       render(smoothed);
       if (time - lastFace > 1200) { lastFace = time; detectFace(session); }
@@ -208,31 +220,22 @@ $('switch').onclick = () => {
   if (phase === 'running') { stop(); unlockAudio(); start(); }
   else message(facing === 'user' ? 'Выбрана фронтальная камера.' : 'Выбрана основная камера.');
 };
-$('sound').onclick = () => {
-  muted = !muted;
-  $('sound').textContent = muted ? '♩' : '♪';
-  $('sound').setAttribute('aria-label', muted ? 'Включить звук' : 'Выключить звук');
-  $('sound').setAttribute('aria-pressed', String(muted));
-  if (!muted) unlockAudio();
-  syncAudio();
-};
-$('referenceFile').onchange = () => {
-  const file = $('referenceFile').files[0];
-  if (!file) return;
-  if (!file.type.startsWith('image/') || file.size > 15 * 1024 * 1024) {
-    faceMessage('Выбери изображение размером до 15 МБ.'); return;
-  }
-  if (referenceUrl) URL.revokeObjectURL(referenceUrl);
-  referenceUrl = URL.createObjectURL(file);
-  $('referencePreview').src = referenceUrl;
-  prepareReference();
-};
-$('resetReference').onclick = () => {
-  if (referenceUrl) URL.revokeObjectURL(referenceUrl);
-  referenceUrl = null; $('referenceFile').value = '';
-  $('referencePreview').src = 'assets/reference.jpg';
-  prepareReference();
-};
+function setMode(next) {
+  mode = next; modeRevision++; faceScore = smoothed = 0;
+  $('face').textContent = '—'; render(0);
+  $('colorMode').setAttribute('aria-pressed', String(mode === 'colors'));
+  $('faceMode').setAttribute('aria-pressed', String(mode === 'face'));
+  $('colorStats').hidden = mode !== 'colors';
+  $('faceStats').hidden = mode !== 'face';
+  $('modeNote').textContent = mode === 'face' ? 'Условное сходство с фиксированными образцами. Обработка на устройстве.' : 'Уровень по белому, синему и красному цветам. Обработка на устройстве.';
+  if (mode === 'face' && !reference) prepareReference();
+}
+$('colorMode').onclick = () => setMode('colors');
+$('faceMode').onclick = () => setMode('face');
+function closeCamera() { stop(); dialog.close(); $('start').focus(); }
+$('closeCamera').onclick = closeCamera;
+dialog.addEventListener('cancel', event => { event.preventDefault(); closeCamera(); });
+dialog.addEventListener('pointerdown', () => { if (phase === 'running') syncAudio(); });
 window.addEventListener('pagehide', () => stop());
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && phase !== 'idle') stop('Измерение остановлено при скрытии вкладки. Нажми «Начать измерение».');
